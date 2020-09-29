@@ -74,17 +74,12 @@ public class MainActivity extends AppCompatActivity {
             return;
         AlertDialog.Builder builder = new AlertDialog.Builder(this);
         builder.setTitle("Overlay permission");
-        builder.setMessage("Overlay permission");
+        builder.setMessage("The application needs this permission in order to run in the background. Probably you should also disable battery optimization for this application.");
         builder.setPositiveButton("OK", new DialogInterface.OnClickListener() {
             private static final int ACTION_MANAGE_OVERLAY_PERMISSION_REQUEST_CODE = 12345;
             public final void onClick(DialogInterface dialogInterface, int i) {
                 startActivityForResult(new Intent("android.settings.action.MANAGE_OVERLAY_PERMISSION", Uri.parse("package:" + getPackageName())), ACTION_MANAGE_OVERLAY_PERMISSION_REQUEST_CODE);
                 dialogInterface.dismiss();
-            }
-        });
-        builder.setOnCancelListener(new DialogInterface.OnCancelListener() {
-            public final void onCancel(DialogInterface dialogInterface) {
-                //MainActivity.this.lambda$checkOverlays$1$MainActivity(dialogInterface);
             }
         });
         builder.show();
