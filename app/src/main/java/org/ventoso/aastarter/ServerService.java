@@ -5,11 +5,8 @@ import android.app.NotificationChannel;
 import android.app.NotificationManager;
 import android.app.PendingIntent;
 import android.app.Service;
-import android.content.ComponentName;
 import android.content.Context;
 import android.content.Intent;
-import android.graphics.Color;
-import android.os.Binder;
 import android.os.Build;
 import android.os.IBinder;
 import android.util.Log;
@@ -21,9 +18,7 @@ import androidx.core.app.TaskStackBuilder;
 import java.io.IOException;
 import java.net.DatagramPacket;
 import java.net.DatagramSocket;
-import java.net.InetAddress;
 import java.net.SocketException;
-import java.net.UnknownHostException;
 
 import static android.app.NotificationManager.IMPORTANCE_HIGH;
 
@@ -44,6 +39,7 @@ public class ServerService extends Service {
 
     @Override
     public void onCreate() {
+        Log.d(TAG, "onCreate");
         super.onCreate();
         String CHANNEL_ONE_ID = "org.ventoso.aastarter";
         String CHANNEL_ONE_NAME = "Channel One";
@@ -86,11 +82,12 @@ public class ServerService extends Service {
 
     @Override
     public int onStartCommand(Intent intent, int flags, int startId) {
+        Log.d(TAG, "onStartCommand");
+        super.onStartCommand(intent, flags, startId);
         if (srvthread!=null)
             return START_STICKY;
         Toast.makeText(this, "service starting", Toast.LENGTH_SHORT).show();
         Log.d(TAG, "Service Started");
-        super.onStartCommand(intent, flags, startId);
         srvthread = new UdpServerThread(UdpServerPORT);
         srvthread.start();
         return START_STICKY;
@@ -98,14 +95,13 @@ public class ServerService extends Service {
 
     @Override
     public void onDestroy() {
-
+        Log.d(TAG, "onDestroy");
         if (srvthread!=null) {
             Toast.makeText(this, "service stopping", Toast.LENGTH_SHORT).show();
-            srvthread.setRunning(false);
+            srvthread.terminate();
             srvthread = null;
         }
         mNotificationManager.cancelAll();
-        android.os.Process.killProcess (android.os.Process.myPid ());
     }
 
     private class UdpServerThread extends Thread{
@@ -119,22 +115,13 @@ public class ServerService extends Service {
             this.serverPort = serverPort;
         }
 
-        public void setRunning(boolean running){
-            this.running = running;
-            if (!running) {
-                try {
-                    /*
-                    DatagramSocket terminator = new DatagramSocket();
-                    byte[] buf = new byte[] { 'E' };
-                    InetAddress address = InetAddress.getLocalHost();
-                    DatagramPacket packet = new DatagramPacket(buf, buf.length, address, serverPort);
-                    terminator.send(packet);
-                     */
-                    if (socket != null)
-                        socket.close();
-                } catch (Exception e) {
-                    Log.e(TAG, "tcp - closing socket "+e.getMessage());
-                }
+        public void terminate(){
+            this.running = false;
+            try {
+                if (socket != null)
+                    socket.close();
+            } catch (Exception e) {
+                Log.e(TAG, "tcp - closing socket "+e.getMessage());
             }
         }
 
@@ -144,10 +131,8 @@ public class ServerService extends Service {
             running = true;
 
             try {
-                //updateState("Starting UDP Server");
                 socket = new DatagramSocket(serverPort);
 
-                //updateState("UDP Server is running");
                 Log.d(TAG, "UDP Server is running");
 
                 while(running) {
@@ -157,34 +142,33 @@ public class ServerService extends Service {
                     // receive request
                     DatagramPacket packet = new DatagramPacket(buf, buf.length);
                     try {
-                        socket.receive(packet);     //this code block the program flow
+                        socket.receive(packet);
                     } catch (IOException e) {
-                        Log.e(TAG, e.getMessage());
-                    }
-
-                    // send the response to the client at "address" and "port"
-                    String address = packet.getAddress().getHostAddress();
-                    Log.d(TAG, "Received "+new String(buf)+" from "+address);
-                    int port = packet.getPort();
-                    if (buf[0] != 'E') {
-                        try {
-                            AALaunch.connect(getApplicationContext(),address);
-                        } catch (Exception e) {
+                        if (running) {
                             Log.e(TAG, e.getMessage());
+                        } else {
+                            Log.d(TAG, "thread terminated, socket.receive threw "+e.getMessage());
                         }
                     }
-                    //updateState("from: " + address + ":" + new String(buf));
+
+                    if (running) {
+                        String address = packet.getAddress().getHostAddress();
+                        Log.d(TAG, "Received " + new String(buf) + " from " + address);
+                        int port = packet.getPort();
+                        if (buf[0] != 'E') {
+                            try {
+                                AALaunch.connect(getApplicationContext(), address);
+                            } catch (Exception e) {
+                                Log.e(TAG, e.getMessage());
+                            }
+                        }
+                    }
                 }
                 Log.e(TAG, "UDP Server ended");
             } catch (SocketException e) {
                 Log.e(TAG, e.getMessage());
-            } finally {
-                if(socket != null){
-                    socket.close();
-                    Log.e(TAG, "socket.close()");
-                }
             }
+            stopSelf();
         }
     }
-
 }
